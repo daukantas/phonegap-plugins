@@ -55,8 +55,11 @@
             // needs to be a regular file
             if (![[attrs fileType] isEqualToString:NSFileTypeRegular]) continue;
 
-            // needs to be a .js or .json file
-            if (![fileName hasSuffix:@".js"] && ![fileName hasSuffix:@".json"]) continue;
+            // needs to be a .js, .coffee or .json file
+            if (![fileName hasSuffix:@".js"] &&
+                ![fileName hasSuffix:@".coffee"] &&
+                ![fileName hasSuffix:@".json"])
+                continue;
 
             // get the file contents
             NSString* contents = [NSString
@@ -71,12 +74,8 @@
             [dict setObject:contents forKey:@"contents"];
 
             [result addObject: dict];
-
         }
 
-        NSLog(@"dirContents of %@:\n%@", bundleRoot, result);
-
-//        [self returnError:@"not yet functional" callback:callback];
         [self returnSuccess:result callback:callback];
     }
 
