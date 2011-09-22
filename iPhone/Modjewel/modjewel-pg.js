@@ -25,20 +25,26 @@ var Modules  = {}
 var Packages = {}
 
 //----------------------------------------------------------------------------
+var fileExists = debugWrapper(fileExists)
 function fileExists(fileName) {
     if (!FileMap) error("trying to access require() before onModulesReady")
 
+console.log("fileExists('" + fileName + "')")
+console.log("   FileMap.hasOwnProperty('" + fileName + "'): " + FileMap.hasOwnProperty(fileName))
+console.log("   FileMap['" + fileName + "']: " + FileMap[fileName])
     if (!FileMap.hasOwnProperty(fileName)) return null
     return FileMap[fileName]
 }
 
 //----------------------------------------------------------------------------
+var packageExists = debugWrapper(packageExists)
 function packageExists(fileName) {
     if (!Packages.hasOwnProperty(fileName)) return null
     return Packages[fileName]
 }
 
 //----------------------------------------------------------------------------
+var moduleExists = debugWrapper(moduleExists)
 function moduleExists(moduleId) {
     if (!Modules.hasOwnProperty(moduleId)) return null
     return Modules[moduleId]
@@ -58,6 +64,7 @@ function getFileAsText(fileName) {
 //----------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------
+var loadAsFile = debugWrapper(loadAsFile)
 function loadAsFile(fileName) {
     if (fileExists(fileName)) return fileName
 
@@ -73,6 +80,7 @@ function loadAsFile(fileName) {
 }
 
 //----------------------------------------------------------------------------
+var loadAsDirectory = debugWrapper(loadAsDirectory)
 function loadAsDirectory(dirName) {
     var jsonFile = dirName + "/package.json"
     var pkg
@@ -107,6 +115,7 @@ function loadAsDirectory(dirName) {
 }
 
 //----------------------------------------------------------------------------
+var loadNodeModules = debugWrapper(loadNodeModules)
 function loadNodeModules(fileName, start) {
     var dirs = nodeModulesPaths(start)
 
@@ -114,10 +123,10 @@ function loadNodeModules(fileName, start) {
         var dir = dirs[i]
         var moduleId
 
-        moduleId = loadAsFile(dir + "/" + fileName)
+        moduleId = loadAsFile(normalize("", dir + "/" + fileName))
         if (moduleId) return moduleId
 
-        moduleId = loadAsDirectory(dir + "/" + fileName)
+        moduleId = loadAsDirectory(normalize("", dir + "/" + fileName))
         if (moduleId) return moduleId
     }
 
@@ -125,6 +134,7 @@ function loadNodeModules(fileName, start) {
 }
 
 //----------------------------------------------------------------------------
+var nodeModulesPaths = debugWrapper(nodeModulesPaths)
 function nodeModulesPaths(start) {
     var parts = start.split("/")
     var root  = parts.indexOf("node_modules")
@@ -140,12 +150,14 @@ function nodeModulesPaths(start) {
         i--
     }
 
-    return dirs
+    if (dirs.length) return dirs
+    return ["."]
 }
 
 //----------------------------------------------------------------------------
 // resolve the actual fileName
 //----------------------------------------------------------------------------
+var resolve = debugWrapper(resolve)
 function resolve(moduleName, path) {
     var moduleId
 
@@ -176,7 +188,7 @@ function getRequire(currentModule) {
     var result = function require(moduleName) {
 
         var moduleId = resolve(moduleName, currentModule.dirName)
-        if (null == moduleId) error("unable to resolve module '" + moduleName + "'")
+        if (null == moduleId) error("unable to resolve module '" + moduleName + "' from module: '" + currentModule.id + "'")
 
         var module = moduleExists(moduleId)
         if (module) return module.exports
@@ -188,20 +200,18 @@ function getRequire(currentModule) {
             factorySource = cs.compile(factorySource)
         }
 
-        factorySource = "function(require,exports,module) {" + factorySource + "}"
+        factorySource = "(function(require,exports,module) {" + factorySource + "})"
 
         var factoryFunc
         try {
-            factoryFunc = eval(factory)
+            factoryFunc = eval(factorySource)
         }
         catch(e) {
             error("error building module " + moduleName + ": " + e)
         }
 
-        var module     = createModule(moduleName)
+        var module     = createModule(moduleId)
         var newRequire = getRequire(module)
-
-        Modules[moduleName] = module
 
         try {
             factoryFunc.call(null, newRequire, module.exports, module)
@@ -223,19 +233,25 @@ function getRequire(currentModule) {
 //----------------------------------------------------------------------------
 // create a new module
 //----------------------------------------------------------------------------
+var createModule = debugWrapper(createModule)
 function createModule(id, dirName) {
     if (!dirName) dirName = getDirName(id)
 
-    return {
+    var module = {
         id:      id,
         exports: {},
         dirName: dirName
     }
+
+    Modules[id] = module
+
+    return module
 }
 
 //----------------------------------------------------------------------------
 // get the path of a file
 //----------------------------------------------------------------------------
+var getDirName = debugWrapper(getDirName)
 function getDirName(fileName) {
     if (!fileName) return ""
 
@@ -247,6 +263,7 @@ function getDirName(fileName) {
 //----------------------------------------------------------------------------
 // normalize a 'file name' with . and .. with a 'directory name'
 //----------------------------------------------------------------------------
+var normalize = debugWrapper(normalize)
 function normalize(dirName, file) {
     var dirParts   = ("" == dirName) ? [] : dirName.split("/")
     var fileParts  = file.split("/")
@@ -274,15 +291,6 @@ function normalize(dirName, file) {
     return dirParts.join("/")
 }
 
-//-------------------------------------------------------------------
-PhoneGap.addConstructor(function() {
-    window.modjewel = {
-        VERSION:         VERSION,
-        require:         getRequire(createModule(".")),
-        onModulesReady:  onModulesReady
-    }
-})
-
 //----------------------------------------------------------------------------
 // throw an error
 //----------------------------------------------------------------------------
@@ -299,30 +307,31 @@ function log(message) {
 }
 
 //-------------------------------------------------------------------
+var onModulesReadyCalled    = false
 var onModulesReadyCallbacks = []
 
 //-------------------------------------------------------------------
 function onModulesReady(callback) {
+    if (onModulesReadyCalled) {
+        try { callback.call() }
+        catch(e) { log("error calling onModuleReady callback '" + callback.name + "': " + e) }
+        return
+    }
     onModulesReadyCallbacks.push(callback)
 }
 
 //-------------------------------------------------------------------
 function getFileMapSuccess(fileMap) {
-    FileMap  = {}
-    for (var i=0; i<fileMap.length; i++) {
-        FileMap[fileMap[i]] = true
-    }
+    FileMap  = fileMap
 
     console.log("modjewel file map: " + JSON.stringify(fileMap,null,4))
 
-    for (var i=0; i<onModulesReadyCallbacks.length; i++) {
-        var callback = onModulesReadyCallbacks[i]
-        try {
-            callback.call()
-        }
-        catch(e) {
-            log("error calling onModuleReady callback '" + callback.name + "': " + e)
-        }
+    onModulesReadyCalled = true
+    var callbacks = onModulesReadyCallbacks.slice()
+    for (var i=0; i<callbacks.length; i++) {
+        var callback = callbacks[i]
+        try { callback() }
+        catch(e) { log("error calling onModuleReady callback '" + callback.name + "': " + e) }
     }
 }
 
@@ -339,6 +348,39 @@ function onDeviceReady() {
         "com.phonegap.modjewel", "getFileMap", [])
 }
 
-document.addEventListener("deviceready", onDeviceReady, false);
+if (PhoneGap.Fake) {
+    setTimeout(onDeviceReady,100)
+}
+else {
+    document.addEventListener("deviceready", onDeviceReady, false);
+}
+
+window.modjewel = {
+    VERSION:         VERSION,
+    require:         getRequire(createModule(".")),
+    onModulesReady:  onModulesReady
+}
+
+//-------------------------------------------------------------------
+var debugWrapperIndent = ""
+function debugWrapper(func) {
+    return function() {
+        if (debugWrapperIndent == null) debugWrapperIndent = ""
+
+        var args = [].slice.call(arguments)
+        console.log(debugWrapperIndent + func.name + "(" + JSON.stringify(args) + ")")
+
+        var oldIndent = debugWrapperIndent
+        debugWrapperIndent += "   "
+
+        var result = func.apply(this, args)
+
+        debugWrapperIndent = oldIndent
+
+        console.log(debugWrapperIndent + func.name + "(" + JSON.stringify(args) + "): " + JSON.stringify(result))
+
+        return result
+    }
+}
 
 })();

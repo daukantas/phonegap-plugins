@@ -27,16 +27,5 @@ function onDeviceReady() {
 
 //------------------------------------------------------------------------------
 function onModulesReady() {
-    modjewel.require("basic/program.js")
-}
-
-//------------------------------------------------------------------------------
-function getModuleSourceSuccess(moduleSource) {
-    console.log("modjewel.getModuleSource(): " + moduleSource)
-
-}
-
-//------------------------------------------------------------------------------
-function getModuleSourceFailure(message) {
-    console.log("failure callback from modjewel.getModuleSource(): " + message)
+    setTimeout(function(){modjewel.require("basic/program")}, 100)
 }

@@ -16,6 +16,6 @@ The file `index.json` is needed for the browser version of the test; it
 supplies the file names in the module directory that a PhoneGap native
 supplies.  To regenerate the guts, run:
 
-    cd test/modules; find . -type f | sed "s/^..\(.*\)/\"\1\",/"
+    cd test/modules; find . -type f | sed "s/^..\(.*\)/\"\1\": {},/"
 
 

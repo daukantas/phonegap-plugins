@@ -5,6 +5,9 @@
  * Copyright (c) 2011, IBM Corporation
  */
 
+debugger
+console.log("in basic.test: " + module.id)
+
 exports.print = function () {
     console.log.apply(console, arguments);
 };

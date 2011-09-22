@@ -31,7 +31,7 @@ PhoneGap.addResource = function(pluginName) {
 //----------------------------------------------------------------------------
 function getFileAsText(fileName) {
     var xhr = new XMLHttpRequest()
-    xhr.open("get","modules/" + fileName, false)
+    xhr.open("get", fileName, false)
     xhr.send()
     return xhr.responseText
 }
@@ -52,7 +52,7 @@ PhoneGap.exec = function(success, fail, pluginLongName, method, args) {
 
 //----------------------------------------------------------------------------
 PhoneGap.addConstructor = function(func) {
-    setTimeout(func, 100)
+    func()
 }
 
 })();

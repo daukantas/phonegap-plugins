@@ -5,4 +5,7 @@
  * Copyright (c) 2011, IBM Corporation
  */
 
-require("bar")
+debugger
+console.log("in basic.foo: " + module.id)
+
+require("./bar")

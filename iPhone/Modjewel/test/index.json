@@ -1,6 +1,6 @@
-[
-"basic/bar.js",
-"basic/foo.js",
-"basic/program.js",
-"basic/test.js"
-]
+{
+"basic/bar.js": {},
+"basic/foo.js": {},
+"basic/program.js": {},
+"basic/test.js": {},
+}
