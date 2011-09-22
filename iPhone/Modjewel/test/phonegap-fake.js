@@ -10,25 +10,49 @@
 
 ;(function(){
 
+//----------------------------------------------------------------------------
 if (window.PhoneGap) return
 
+//----------------------------------------------------------------------------
 window.PhoneGap = {}
 
+//----------------------------------------------------------------------------
 PhoneGap.Fake = true
 
+//----------------------------------------------------------------------------
 PhoneGap.hasResource = function(pluginName) {
     return false
 }
 
+//----------------------------------------------------------------------------
 PhoneGap.addResource = function(pluginName) {
 }
 
-PhoneGap.exec = function(success, fail, pluginLongName, method, args) {
-    console.log("wanted to run " + pluginLongName + "." + method + "(" + args + ")")
+//----------------------------------------------------------------------------
+function getFileAsText(fileName) {
+    var xhr = new XMLHttpRequest()
+    xhr.open("get","modules/" + fileName, false)
+    xhr.send()
+    return xhr.responseText
 }
 
+//----------------------------------------------------------------------------
+PhoneGap.exec = function(success, fail, pluginLongName, method, args) {
+    method = pluginLongName + "." + method
+
+    if (method == "com.phonegap.modjewel.getFileMap") {
+        var text = getFileAsText("index.json")
+        var obj = JSON.parse(text)
+        setTimeout(function() {success(obj)}, 100)
+    }
+    else {
+        console.log("not supported: PhoneGap.exec(" + pluginLongName + "." + method + "(" + args + ")")
+    }
+}
+
+//----------------------------------------------------------------------------
 PhoneGap.addConstructor = function(func) {
-    func.call()
+    setTimeout(func, 100)
 }
 
 })();

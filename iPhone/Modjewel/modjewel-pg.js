@@ -10,9 +10,8 @@
 //----------------------------------------------------------------------------
 // some constants
 //----------------------------------------------------------------------------
-var PROGRAM = "modjewel"
-var VERSION = "1.2.0"
-
+var PROGRAM = "modjewel-pg"
+var VERSION = "1.0.0"
 
 //-------------------------------------------------------------------
 if (PhoneGap.hasResource(PROGRAM)) return
@@ -21,15 +20,54 @@ PhoneGap.addResource(PROGRAM)
 //----------------------------------------------------------------------------
 // "globals" (local to this function scope though)
 //----------------------------------------------------------------------------
-var ModuleSource = null
-var ModuleStore  = {}
+var FileMap  = null
+var Modules  = {}
+var Packages = {}
+
+//----------------------------------------------------------------------------
+function fileExists(fileName) {
+    if (!FileMap) error("trying to access require() before onModulesReady")
+
+    if (!FileMap.hasOwnProperty(fileName)) return null
+    return FileMap[fileName]
+}
+
+//----------------------------------------------------------------------------
+function packageExists(fileName) {
+    if (!Packages.hasOwnProperty(fileName)) return null
+    return Packages[fileName]
+}
+
+//----------------------------------------------------------------------------
+function moduleExists(moduleId) {
+    if (!Modules.hasOwnProperty(moduleId)) return null
+    return Modules[moduleId]
+}
+
+//----------------------------------------------------------------------------
+function getFileAsText(fileName) {
+    var xhr = new XMLHttpRequest()
+    xhr.open("get","modules/" + fileName, false)
+    xhr.send()
+    return xhr.responseText
+}
+
+//----------------------------------------------------------------------------
+// node.js's module resolution process, as doc'd in:
+//     http://nodejs.org/docs/v0.4.12/api/modules.html#all_Together...
+//----------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------
 function loadAsFile(fileName) {
-    if (hop(ModuleSource, fileName) return ModuleSource[fileName]
+    if (fileExists(fileName)) return fileName
 
-    fileName += ".js"
-    if (hop(ModuleSource, fileName) return ModuleSource[fileName]
+    var origFileName = fileName
+
+    fileName = origFileName + ".js"
+    if (fileExists(fileName)) return fileName
+
+    fileName = origFileName + ".coffee"
+    if (fileExists(fileName)) return fileName
 
     return null
 }
@@ -37,23 +75,33 @@ function loadAsFile(fileName) {
 //----------------------------------------------------------------------------
 function loadAsDirectory(dirName) {
     var jsonFile = dirName + "/package.json"
-    if (hop(ModuleSource, jsonFile)) {
-        var json = ModuleSource[jsonFile].content
+    var pkg
+    var moduleId
 
-        try {
-            var val = JSON.parse(json)
+    if (fileExists(jsonFile)) {
+        if (packageExists(fileName)) {
+            pkg = Packages[fileName]
         }
-        catch(e) {
-            error("unable to parse JSON file '" + jsonFile + "': " + e
+        else {
+            try {
+                var pkgSource = getFileAsText(jsonFile)
+                pkg = JSON.parse(pkgSource)
+                Packages[jsonFile] = pkg
+            }
+            catch(e) {
+                error("error loading '" + jsonFile + "': " + e)
+            }
         }
 
-        var main = val.main
-        var result = loadAsFile(dirName + "/" + main)
-        if (result) return result
+        if (!pkg.main) error("no main entry in '" + jsonFile + "'")
+
+        var fileName = normalize(dirName, pkg.main)
+        moduleId = loadAsFile(fileName)
+        if (moduleId) return moduleId
     }
 
-    var result = loadAsFile(dirName + "/index")
-    if (result) return result
+    var moduleId = loadAsFile(dirName + "/index")
+    if (moduleId) return moduleId
 
     return null
 }
@@ -64,14 +112,16 @@ function loadNodeModules(fileName, start) {
 
     for (var i=0; i<dirs.length; i++) {
         var dir = dirs[i]
-        var result
+        var moduleId
 
-        result = loadAsFile(dir + "/" + fileName)
-        if (result) return result
+        moduleId = loadAsFile(dir + "/" + fileName)
+        if (moduleId) return moduleId
 
-        result = loadAsDirectory(dir + "/" + fileName)
-        if (result) return result
+        moduleId = loadAsDirectory(dir + "/" + fileName)
+        if (moduleId) return moduleId
     }
+
+    return null
 }
 
 //----------------------------------------------------------------------------
@@ -94,43 +144,71 @@ function nodeModulesPaths(start) {
 }
 
 //----------------------------------------------------------------------------
+// resolve the actual fileName
+//----------------------------------------------------------------------------
+function resolve(moduleName, path) {
+    var moduleId
+
+    if (moduleName.match(/^\//)) {
+        error("absolute module names not supported: " + moduleName)
+    }
+
+    if (moduleName.match(/^\.{1,2}\//)) {
+        moduleId = loadAsFile(normalize(path, moduleName))
+        if (moduleId) return moduleId
+
+        moduleId = loadAsDirectory(normalize(path, moduleName))
+        if (moduleId) return moduleId
+     }
+
+     moduleName = normalize("", moduleName)
+
+     moduleId = loadNodeModules(moduleName, getDirName(path))
+     if (moduleId) return moduleId
+
+     return null
+}
+
+//----------------------------------------------------------------------------
 // the require function
 //----------------------------------------------------------------------------
-function get_require(currentModule) {
-    var result = function require(moduleId) {
+function getRequire(currentModule) {
+    var result = function require(moduleName) {
 
-        var relative = false
-        if (moduleId.match(/^\.{1,2}\//)) {
-            relative = true
-            moduleId = normalize(currentModule, moduleId)
+        var moduleId = resolve(moduleName, currentModule.dirName)
+        if (null == moduleId) error("unable to resolve module '" + moduleName + "'")
+
+        var module = moduleExists(moduleId)
+        if (module) return module.exports
+
+        var factorySource = getFileAsText(moduleId)
+
+        if (moduleId.match(/\.coffee$/)) {
+            var cs = require("coffee-script")
+            factorySource = cs.compile(factorySource)
         }
 
-        if (hop(ModuleStore, moduleId)) {
-            return ModuleStore[moduleId].exports
-        }
+        factorySource = "function(require,exports,module) {" + factorySource + "}"
 
-        var factory = ModuleSource[moduleId]
         var factoryFunc
-
-        factory = "function(require,exports,module) {" + factory + "}
-
         try {
             factoryFunc = eval(factory)
         }
         catch(e) {
-            error("error building module " + moduleId + ": " + e)
+            error("error building module " + moduleName + ": " + e)
         }
 
-        var module     = create_module(moduleId)
-        var newRequire = get_require(module)
+        var module     = createModule(moduleName)
+        var newRequire = getRequire(module)
 
-        ModuleStore[moduleId] = module
+        Modules[moduleName] = module
 
         try {
             factoryFunc.call(null, newRequire, module.exports, module)
         }
         catch(e) {
-            error("error running module " + moduleId + ": " + e)
+            delete Modules[moduleName]
+            error("error running module " + moduleName + ": " + e)
         }
 
         return module.exports
@@ -143,29 +221,25 @@ function get_require(currentModule) {
 }
 
 //----------------------------------------------------------------------------
-// shorter version of hasOwnProperty
-//----------------------------------------------------------------------------
-function hop(object, name) {
-    return Object.prototype.hasOwnProperty.call(object, name)
-}
-
-//----------------------------------------------------------------------------
 // create a new module
 //----------------------------------------------------------------------------
-function create_module(id) {
+function createModule(id, dirName) {
+    if (!dirName) dirName = getDirName(id)
+
     return {
         id:      id,
-        exports: {}
+        exports: {},
+        dirName: dirName
     }
 }
 
 //----------------------------------------------------------------------------
-// get the path of a module
+// get the path of a file
 //----------------------------------------------------------------------------
-function getModulePath(module) {
-    if (!module || !module.id) return ""
+function getDirName(fileName) {
+    if (!fileName) return ""
 
-    var parts = module.id.split("/")
+    var parts = fileName.split("/")
 
     return parts.slice(0, parts.length-1).join("/")
 }
@@ -173,9 +247,8 @@ function getModulePath(module) {
 //----------------------------------------------------------------------------
 // normalize a 'file name' with . and .. with a 'directory name'
 //----------------------------------------------------------------------------
-function normalize(module, file) {
-    var modulePath = getModulePath(module)
-    var dirParts   = ("" == modulePath) ? [] : modulePath.split("/")
+function normalize(dirName, file) {
+    var dirParts   = ("" == dirName) ? [] : dirName.split("/")
     var fileParts  = file.split("/")
 
     for (var i=0; i<fileParts.length; i++) {
@@ -189,8 +262,7 @@ function normalize(module, file) {
                 dirParts.pop()
             }
             else {
-                // error("error normalizing '" + module + "' and '" + file + "'")
-                // eat non-valid .. paths
+                error("too many ..'s in file name '" + file + "'")
             }
         }
 
@@ -201,6 +273,15 @@ function normalize(module, file) {
 
     return dirParts.join("/")
 }
+
+//-------------------------------------------------------------------
+PhoneGap.addConstructor(function() {
+    window.modjewel = {
+        VERSION:         VERSION,
+        require:         getRequire(createModule(".")),
+        onModulesReady:  onModulesReady
+    }
+})
 
 //----------------------------------------------------------------------------
 // throw an error
@@ -217,20 +298,6 @@ function log(message) {
     console.log(PROGRAM + ": " + message)
 }
 
-//----------------------------------------------------------------------------
-// make the require function a global
-//----------------------------------------------------------------------------
-require_reset()
-
-//-------------------------------------------------------------------
-PhoneGap.addConstructor(function() {
-    window.modjewel = {
-        VERSION:         VERSION,
-        require:         get_require(create_module(null)),
-        onModulesReady:  onModulesReady
-    }
-})
-
 //-------------------------------------------------------------------
 var onModulesReadyCallbacks = []
 
@@ -240,8 +307,13 @@ function onModulesReady(callback) {
 }
 
 //-------------------------------------------------------------------
-function getModuleSourceSuccess(moduleSource) {
-    ModuleSource = moduleSource
+function getFileMapSuccess(fileMap) {
+    FileMap  = {}
+    for (var i=0; i<fileMap.length; i++) {
+        FileMap[fileMap[i]] = true
+    }
+
+    console.log("modjewel file map: " + JSON.stringify(fileMap,null,4))
 
     for (var i=0; i<onModulesReadyCallbacks.length; i++) {
         var callback = onModulesReadyCallbacks[i]
@@ -255,16 +327,16 @@ function getModuleSourceSuccess(moduleSource) {
 }
 
 //-------------------------------------------------------------------
-function getModuleSourceFailure(message) {
-    log("error loading module source: " + message)
+function getFileMapFailure(message) {
+    error("error loading file map: " + message)
 }
 
 //-------------------------------------------------------------------
 function onDeviceReady() {
     PhoneGap.exec(
-        getModuleSourceSuccess,
-        getModuleSourceFailure,
-        "com.phonegap.modjewel", "getModuleSource", [])
+        getFileMapSuccess,
+        getFileMapFailure,
+        "com.phonegap.modjewel", "getFileMap", [])
 }
 
 document.addEventListener("deviceready", onDeviceReady, false);

@@ -13,23 +13,26 @@ function onLoad() {
     }
 
     if (PhoneGap.Fake) {
-        onDeviceReady()
+        setTimeout(onDeviceReady,200)
     }
     else {
-        document.addEventListener("deviceready", onDeviceReady, false);
+        document.addEventListener("deviceready", onDeviceReady, false)
     }
 }
 
 //------------------------------------------------------------------------------
 function onDeviceReady() {
-    modjewel.getModuleSource(getModuleSourceSuccess, getModuleSourceFailure)
+    modjewel.onModulesReady(onModulesReady)
+}
+
+//------------------------------------------------------------------------------
+function onModulesReady() {
+    modjewel.require("basic/program.js")
 }
 
 //------------------------------------------------------------------------------
 function getModuleSourceSuccess(moduleSource) {
     console.log("modjewel.getModuleSource(): " + moduleSource)
-
-    modjewel.require("basic/program.js")
 
 }
 

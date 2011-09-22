@@ -19,8 +19,11 @@
 // plugin class
 //------------------------------------------------------------------------------
 @interface PGModjewel : PGPlugin {}
-    - (void)getModuleSource:(NSMutableArray*)arguments withDict:(NSMutableDictionary*)options;
-    - (void)returnSuccess:(NSString*)scannedText callback:(NSString*)callback;
+    @property (nonatomic, retain) NSString* fileMapString;
+
+    - (NSString*)buildFileMapString;
+    - (void)getFileMap:(NSMutableArray*)arguments withDict:(NSMutableDictionary*)options;
+    - (void)returnSuccess:(id)fileMap callback:(NSString*)callback;
     - (void)returnError:(NSString*)message callback:(NSString*)callback;
 @end
 
@@ -28,66 +31,54 @@
 // plugin class
 //------------------------------------------------------------------------------
 @implementation PGModjewel
+    @synthesize fileMapString = _fileMapString;
 
     //--------------------------------------------------------------------------
-    - (void)getModuleSource:(NSMutableArray*)arguments withDict:(NSMutableDictionary*)options {
-        NSString*      callback      = [arguments objectAtIndex:0];
+    - (NSString*)buildFileMapString {
         NSFileManager* nsFileManager = [NSFileManager defaultManager];
+        NSString*      bundlePath    = [[NSBundle mainBundle] bundlePath];
 
         // get the root directory of the modules
-        NSString* bundleRoot = [NSString
-            stringWithFormat: @"%@/www/modules",
-            [[NSBundle mainBundle] bundlePath]
-        ];
+        NSString* bundleRoot = [NSString stringWithFormat: @"%@/www/modules", bundlePath];
 
         // get all the files under that root directory
         NSArray* fileNames = [nsFileManager subpathsAtPath:bundleRoot];
 
-        id result = [[[NSMutableArray alloc] init] autorelease];
-
-        // iterate through the files
+        NSMutableArray* filteredFileNames = [[[NSMutableArray alloc] init] autorelease];
         for (NSString* fileName in fileNames) {
-            NSString* fullName = [NSString stringWithFormat:@"%@/%@", bundleRoot, fileName];
+            NSString*     fullFileName = [NSString stringWithFormat: @"%@/%@", bundleRoot, fileName];
+            NSDictionary* attrs        = [nsFileManager attributesOfItemAtPath:fullFileName error:nil];
+            NSString*     fileType     = [attrs fileType];
 
-            // get file attrs
-            NSDictionary* attrs = [nsFileManager attributesOfItemAtPath:fullName error:nil];
+            if (![fileType isEqualToString:NSFileTypeRegular]) continue;
 
-            // needs to be a regular file
-            if (![[attrs fileType] isEqualToString:NSFileTypeRegular]) continue;
-
-            // needs to be a .js, .coffee or .json file
-            if (![fileName hasSuffix:@".js"] &&
-                ![fileName hasSuffix:@".coffee"] &&
-                ![fileName hasSuffix:@".json"])
-                continue;
-
-            // get the file contents
-            NSString* contents = [NSString
-                stringWithContentsOfFile:fullName
-                encoding:NSUTF8StringEncoding
-                error:nil
-            ];
-
-            id dict = [[[NSMutableDictionary alloc] init] autorelease];
-
-            [dict setObject:fileName forKey:@"fileName"];
-            [dict setObject:contents forKey:@"contents"];
-
-            [result addObject: dict];
+            [filteredFileNames addObject: fileName];
         }
 
-        [self returnSuccess:result callback:callback];
+        // convert to JSON
+        SBJSON* jsonLib = [[[SBJSON alloc] init] autorelease];
+        NSString* json = [jsonLib stringWithObject:filteredFileNames allowScalar:YES error:nil];
+
+        return json;
     }
 
     //--------------------------------------------------------------------------
-    - (void)returnSuccess:(id)moduleSource callback:(NSString*)callback {
-        SBJSON* jsonLib = [[[SBJSON alloc] init] autorelease];
+    - (void)getFileMap:(NSMutableArray*)arguments withDict:(NSMutableDictionary*)options {
+        NSString*      callback      = [arguments objectAtIndex:0];
 
-        NSString* moduleSource_js = [jsonLib stringWithObject:moduleSource allowScalar:YES error:nil];
+        if (!self.fileMapString) {
+            self.fileMapString = [self buildFileMapString];
+        }
+
+        [self returnSuccess:self.fileMapString callback:callback];
+    }
+
+    //--------------------------------------------------------------------------
+    - (void)returnSuccess:(id)fileMapString callback:(NSString*)callback {
 
         PluginResult* result = [PluginResult
             resultWithStatus: PGCommandStatus_OK
-            messageAsArray: [NSArray arrayWithObject:moduleSource_js]
+            messageAsArray: [NSArray arrayWithObject:fileMapString]
         ];
 
         NSString* js = [result toSuccessCallbackString:callback];
