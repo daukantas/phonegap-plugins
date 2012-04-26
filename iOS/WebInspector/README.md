@@ -25,8 +25,8 @@ what is it
 
 The WebInspector plugin will enable remote Web Inspector.  Add the plugin
 to your application, and when you run it, you can dial into Web Inspector
-running on your device by browsing to [http://localhost:9999](http://localhost:9999)
-on the machine your device is connected to.
+by browsing to [http://localhost:9999](http://localhost:9999)
+on your desktop.
 
 Only works with iOS 5.1, in the simulator.
 
@@ -42,7 +42,24 @@ Compatible with the following versions of Cordova:
 * 1.6.1
 
 Original idea from 
-[Nathan de Vries](http://atnan.com/blog/2011/11/17/enabling-remote-debugging-via-private-apis-in-mobile-safari/).
+[Nathan de Vries](http://atnan.com/blog/2011/11/17/enabling-remote-debugging-via-private-apis-in-mobile-safari/)
+and further egged on by
+[Maximiliano Firtman](http://firt.mobi/)'s [iWebInspector](http://www.iwebinspector.com/) tool.
+
+other notes
+------------------------------------
+
+When you browse to [http://localhost:9999](http://localhost:9999), note that
+it usually just contains one link, that you can click on, which takes you to
+[http://localhost:9999/?page=1](http://localhost:9999/?page=1).  This is the
+page that actually displays Web Inspector.
+
+In case you have multiple WebViews running, those other WebViews will
+be available at different page #'s, like
+[http://localhost:9999/?page=2](http://localhost:9999/?page=2), etc.
+The list of debuggable pages at [http://localhost:9999](http://localhost:9999)
+may provide enough information to figure out which WebView is which, but if
+not, try 'em all.
 
 
 using the plugin
