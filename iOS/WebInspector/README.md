@@ -1,20 +1,4 @@
-<!-- 
-//------------------------------------------------------------------------------
-// Copyright 2012 IBM
-// 
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// 
-//    http://www.apache.org/licenses/LICENSE-2.0
-// 
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//------------------------------------------------------------------------------
--->
+<!-- Licensed under the Apache License, Version 2.0. See footer for details -->
 
 Cordova Web Inspector plugin for iOS
 ====================================
@@ -30,7 +14,7 @@ on your desktop.
 
 Only works with iOS 5.1, in the simulator.
 
-You **cannot** open the URL for remote Web Inspector in Chrome.  Use Safari
+You **CANNOT** open the URL for remote Web Inspector in Chrome.  Use Safari
 instead.  It works on Safari 5.1.5 (7534.55.3).
 
 The code that enables Web Inspector is conditionally removed if you are not
@@ -40,6 +24,7 @@ production version of your app.  Good luck, let us know how *that* turns out.
 Compatible with the following versions of Cordova:
 
 * 1.6.1
+* 1.7.0
 
 Original idea from 
 [Nathan de Vries](http://atnan.com/blog/2011/11/17/enabling-remote-debugging-via-private-apis-in-mobile-safari/)
@@ -79,12 +64,11 @@ by editing the file `Cordova.plist` and in the `Plugins` dictionary adding
 the following key/value pair:
 
     <table>
-    <tr><td>key:   <td>&nbsp; <td><tt>org.muellerware.WebInspector</tt>
+    <tr><td>key:   <td>&nbsp; <td><tt>org.apache.cordova.WebInspector</tt>
     <tr><td>value: <td>&nbsp; <td><tt>CDVWebInspector</tt>
     </table>
 
-Nothing else for you to do. No JavaScript for you to call, just 
-include the plugin's `.js` file in your `.html` file.
+Nothing else for you to do. No JavaScript for you to call.
 
 A message will be logged to the Xcode console
 indicating success or failure at enabling remote Web Inspector.
@@ -131,6 +115,14 @@ copyright/license
 
 Copyright 2012 IBM
 
-Licensed under [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
+   [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
 
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
